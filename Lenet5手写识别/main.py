@@ -18,6 +18,7 @@ import time
 
 from torch.utils.tensorboard import SummaryWriter
 from model import Lenet5
+from utils import progress_bar
 
 def train(epoch):
     net.train()
@@ -46,13 +47,15 @@ def train(epoch):
         correct+=predicate.eq(label).sum().item()
         acc=100*correct/total
         writer.add_scalar('train/loss',iter_loss,n_iter)
-        print('Training Epoch: {epoch} [{trained_samples}/{total_samples}]\tLoss: {:0.4f}\tLR: {:0.6f}'.format(
-            iter_loss.item(),
-            optimizer.param_groups[0]['lr'],
-            epoch=epoch,
-            trained_samples=n_iter,
-            total_samples=int(len(train_loadata.dataset)/batchsize)+(len(train_loadata.dataset)%batchsize ==1)
-        ))
+        # print('Training Epoch: {epoch} [{trained_samples}/{total_samples}]\tLoss: {:0.4f}\tLR: {:0.6f}'.format(
+        #     iter_loss.item(),
+        #     optimizer.param_groups[0]['lr'],
+        #     epoch=epoch,
+        #     trained_samples=n_iter,
+        #     total_samples=int(len(train_loadata.dataset)/batchsize)+(len(train_loadata.dataset)%batchsize ==1)
+        # ))
+        
+        progress_bar(batch_idx,len(train_loadata),'Loss:{:0.4f} |  LR:{:0.6f}'.format(iter_loss.item(),optimizer.param_groups[0]['lr']))
 
 
 def test(epoch):
@@ -68,32 +71,31 @@ def test(epoch):
                 input,label = input.to(device),label.to(device)
             output = net(input)
             iter_loss = loss(output,label).item()
-            
-            
             _,predicted = output.max(1)
             batchsize = predicted.size(0)
             test_loss +=iter_loss
             n_iter = batch_idx
-            
             correct+=predicted.eq(label).sum().item()
+            iter_acc=correct/ ((batch_idx+1)*batchsize)*100
             writer.add_scalar('test/loss',iter_loss,n_iter) 
             writer.add_scalar('test/acc',correct/((batch_idx+1)*batchsize),)
+            progress_bar(batch_idx,len(test_loadata),'Loss:{:0.4f} |  Acc:{:0.6f}'.format(iter_loss,iter_acc))
         finish = time.time()
         acc=correct / len(test_loadata.dataset)*100
         print('Evaluating Network.....')
-        print('Test set: Epoch: {}, Average loss: {:.4f}, Accuracy: {:.4f}, Time consumed:{:.2f}s'.format(
-            epoch,
-            test_loss / len(test_loadata.dataset),
-            acc,
-            finish - start
-        ))
+        # print('Test set: Epoch: {}, Average loss: {:.4f}, Accuracy: {:.4f}, Time consumed:{:.2f}s'.format(
+        #     epoch,
+        #     test_loss / len(test_loadata.dataset),
+        #     acc,
+        #     finish - start
+        # ))
         
     if acc>best_acc:
         print('Saving .....')
         state = {
             'net':net.state_dict(),
             'acc':acc,
-            'epcoh':epoch,
+            'epoch':epoch,
         }
         if not os.path.isdir(ospath+'/checkpoint'):
             os.mkdir(ospath+'/checkpoint')
@@ -101,6 +103,7 @@ def test(epoch):
         best_acc = acc
 
 if __name__=='__main__':
+    RESUME=False
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ospath=os.path.split(os.path.realpath(__file__))[0].replace("\\","/")
     print('Loading datas .......')
@@ -132,6 +135,14 @@ if __name__=='__main__':
     print('building model.....')
     net=Lenet5()
     net = net.to(device)
+    modelname=type(net).__name__
+    if RESUME:
+        print('Resuming from checkpoint..... ')
+        assert os.path.isdir(ospath+'/checkpoint'),'Error: no checkpoint find'
+        checkpoint = torch.load(ospath+'/checkpoint/' + modelname +'.pth' )
+        net.load_state_dict(checkpoint['net'])
+        best_acc = checkpoint['acc']
+        startepoch = checkpoint['epoch']
 
     print('Prepare for tensorboard......')
     modelname=type(net).__name__ # get the model name

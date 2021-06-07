@@ -1,5 +1,8 @@
 '''
+2021年6月6日 17:17:54
+zyw
 lenet 识别手写字体
+
 '''
 import torch
 from torch import optim

@@ -42,7 +42,7 @@ python main.py
 
 - 方案一的缺点都可以解决，就是写起来有点点麻烦的感觉。
 
-
+![image-20210605005829373](D:\Desktop\Practice\Lenet5手写识别\images\image-20210605005829373.png)
 
 保存模型的策略：
 

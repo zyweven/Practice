@@ -90,8 +90,16 @@ if __name__ == "__main__":
     name='Lenet5'
     net = eval(name)()
     # test(net)
-    draw(name)
-    summry(net)
+    # draw(name)
+    # summry(net)
+    print(net)#可以看出网络一共有3层，两个Sequential()+avgpool
+    model_features = list(net.children())
+    print(model_features)
+    # print(model_features[0][3])#取第0层Sequential()中的第四层
+    # print()
+    # for index,layer in enumerate(model_features[0]):
+    #     print(layer)
+
 # ==========================================================================================
 # Layer (type:depth-idx)                   Output Shape              Param #
 # ==========================================================================================

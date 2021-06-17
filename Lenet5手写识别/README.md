@@ -36,13 +36,13 @@ python main.py
 
 - 可以换成一个batch一次比较好。
 
-  ![image-20210605005324371](D:\Desktop\Practice\Lenet5手写识别\images\image-20210605005324371.png)
+  ![image-20210605005324371](images\image-20210605005324371.png)
 
 2、进度条
 
 - 方案一的缺点都可以解决，就是写起来有点点麻烦的感觉。
 
-![image-20210605005829373](D:\Desktop\Practice\Lenet5手写识别\images\image-20210605005829373.png)
+![image-20210605005829373](images\image-20210605005829373.png)
 
 保存模型的策略：
 

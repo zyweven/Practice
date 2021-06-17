@@ -10,7 +10,7 @@ from torch._C import device
 from torch.autograd.grad_mode import no_grad
 import torch.nn as nn
 import torch.nn.functional as F
-
+import matplotlib.pyplot as plt
 import torchvision
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -18,7 +18,7 @@ from torch.utils.data import DataLoader
 import os
 from datetime import datetime
 import time
-
+os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 from torch.utils.tensorboard import SummaryWriter
 from model import Lenet5
 from utils import progress_bar
@@ -106,7 +106,15 @@ def test(epoch):
         best_acc = acc
 
 if __name__=='__main__':
+    # hyp
+    lr=0.0001
+    TMAX=200
+    momentum=0.9
+    startepoch=0
+    endepoch=200
+    best_acc = 0 
     RESUME=False
+
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ospath=os.path.split(os.path.realpath(__file__))[0].replace("\\","/")
     print('Loading datas .......')
@@ -131,7 +139,7 @@ if __name__=='__main__':
         train_data,batch_size=32,shuffle=True,num_workers=1
     )
     test_loadata = DataLoader(
-        test_data,batch_size=32,shuffle=True,num_workers=1
+        test_data,batch_size=1,shuffle=True,num_workers=1
     )
     print("data over.......")
     
@@ -163,13 +171,7 @@ if __name__=='__main__':
     writer.add_graph(net,td_inputtensor)
     print('tensorboard ready')
 
-    # hyp
-    lr=0.0001
-    TMAX=200
-    momentum=0.9
-    startepoch=0
-    endepoch=200
-    best_acc = 0 
+
     print('loss, optimizer and scheduler......')
     loss = nn.CrossEntropyLoss()
     # optimizer = optim.adam(net.parameters(),lr)

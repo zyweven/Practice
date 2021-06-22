@@ -5,7 +5,7 @@ import torch.nn.functional as  F
 class Lenet5(nn.Module):
     def __init__(self):
         super(Lenet5,self).__init__()
-        self.convC1 = nn.Conv2d(3,6,kernel_size=5)
+        self.convC1 = nn.Conv2d(3,6,kernel_size=5)# 3表示输入图片是3通道的，6表示输出6个特征图，也就是6个卷积核
         self.convC3 = nn.Conv2d(6,16,kernel_size=5)
         self.Flat = nn.Flatten()
         self.FlatC51 = nn.Linear(400,120)
@@ -20,7 +20,7 @@ class Lenet5(nn.Module):
         out=F.max_pool2d(out,2)
         # out = out.view(out.size(0), -1) # 效果貌似和Flatten一样
         out = self.Flat(out)
-        # print(out.shape)
+        # print(out.shape)#(2,400) 其中2是bathsize,400是前面三个通道相乘得到的16*5*5
         out=self.FlatC51(out)
         out=self.FlatC52(out)
         out=self.FlatC53(out)
@@ -90,10 +90,10 @@ def summry(net):
 if __name__ == "__main__":
     name='Lenet5'
     net = eval(name)()
-    # test(net)
+    test(net)
     # draw(name)
-    # summry(net)
-    print(net)#可以看出网络一共有3层，两个Sequential()+avgpool
+    summry(net)
+    print(net)
     model_features = list(net.children())
     print(model_features)
     # print(model_features[0][3])#取第0层Sequential()中的第四层

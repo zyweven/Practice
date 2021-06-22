@@ -4,6 +4,7 @@ zyw
 Alexnet 识别猫狗
 
 '''
+from numpy.core.fromnumeric import resize
 import torch
 from torch import optim
 from torch._C import device
@@ -20,8 +21,9 @@ from datetime import datetime
 import time
 os.environ['KMP_DUPLICATE_LIB_OK'] = 'TRUE'
 from torch.utils.tensorboard import SummaryWriter
-from model import Lenet5
+from model import Alexnet
 from utils import progress_bar
+from dataset import CatDogDataset
 
 def train(epoch):
     net.train()
@@ -29,8 +31,11 @@ def train(epoch):
     total = 0
     correct=0
     for batch_idx,(input,label) in enumerate(train_loadata):
+        # print(label)
         if device =='cuda':
-            input,label=input.to(device),label.to(device)
+            input=input.to(device)
+            label=label.to(device)
+        # plt.imshow(input)
         optimizer.zero_grad()
         output=net(input)
         iter_loss = loss(output,label)
@@ -39,8 +44,6 @@ def train(epoch):
         batchsize=label.size(0)
         # tensorboard 
         n_iter = batch_idx
-        # print(batch_idx)
-
         train_loss+=iter_loss.item()
         _,predicate = output.max(1) #返回每一行中最大的元素并返回索引，返回了两个数组.predicate返回的就是索引 max(0)是返回每列的。
         
@@ -70,8 +73,10 @@ def test(epoch):
     start=time.time()
     with torch.no_grad():
         for batch_idx ,(input,label) in enumerate(test_loadata):
+            # print(label)
             if device == 'cuda':
-                input,label = input.to(device),label.to(device)
+                input=input.to(device)
+                label = label.to(device)
             output = net(input)
             iter_loss = loss(output,label).item()
             _,predicted = output.max(1)
@@ -119,31 +124,35 @@ if __name__=='__main__':
     ospath=os.path.split(os.path.realpath(__file__))[0].replace("\\","/")
     print('Loading datas .......')
     transforms_train = transforms.Compose([
-        transforms.RandomCrop(32,padding=4),
+        transforms.Resize(256),
+        transforms.RandomCrop(224,padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     ])
     transforms_test = transforms.Compose([
+        transforms.Resize((224,224)),
         transforms.ToTensor(),
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     ])
 
-
-    train_data = 
-    test_data = 
+    datapath =os.path.join(ospath,'data')
+    train_data = CatDogDataset(file_path=datapath,flag='train',transform=transforms_train)
+    print(train_data)
+    test_data = CatDogDataset(file_path=datapath,flag='test',transform=transforms_test)
+    print(test_data)
 
 
     train_loadata=DataLoader(
         train_data,batch_size=32,shuffle=True,num_workers=1
     )
     test_loadata = DataLoader(
-        test_data,batch_size=1,shuffle=True,num_workers=1
+        test_data,batch_size=2,shuffle=True,num_workers=1
     )
     print("data over.......")
     
     print('building model.....')
-    net=Lenet5()
+    net=Alexnet()
     net = net.to(device)
     modelname=type(net).__name__
     if RESUME:
@@ -164,7 +173,7 @@ if __name__=='__main__':
     writer = SummaryWriter(log_dir=os.path.join(
             ospath+'/runs',modelname,TIME_NOW))
     # draw the model structure in tensorboard
-    td_inputtensor = torch.Tensor(1,3,32,32)
+    td_inputtensor = torch.Tensor(1,3,224,224)
     if device == 'cuda' :
         td_inputtensor=td_inputtensor.cuda()
     writer.add_graph(net,td_inputtensor)

@@ -24,12 +24,14 @@ from torch.utils.tensorboard import SummaryWriter
 from model import Alexnet
 from utils import progress_bar
 from dataset import CatDogDataset
-
+train_iter=0
+test_iter=0
 def train(epoch):
     net.train()
     train_loss=0
     total = 0
     correct=0
+    global train_iter
     for batch_idx,(input,label) in enumerate(train_loadata):
         # print(label)
         if device =='cuda':
@@ -43,28 +45,30 @@ def train(epoch):
         optimizer.step()
         batchsize=label.size(0)
         # tensorboard 
-        n_iter = batch_idx
+        train_iter += batch_idx
         train_loss+=iter_loss.item()
         _,predicate = output.max(1) #返回每一行中最大的元素并返回索引，返回了两个数组.predicate返回的就是索引 max(0)是返回每列的。
-        
         total+=label.size(0) 
-
         # print(label.size(0)) # label.size(0)表示batchsize
         correct+=predicate.eq(label).sum().item()
         acc=100*correct/total
-        writer.add_scalar('train/loss',iter_loss,n_iter)
-        # print('Training Epoch: {epoch} [{trained_samples}/{total_samples}]\tLoss: {:0.4f}\tLR: {:0.6f}'.format(
-        #     iter_loss.item(),
-        #     optimizer.param_groups[0]['lr'],
-        #     epoch=epoch,
-        #     trained_samples=n_iter,
-        #     total_samples=int(len(train_loadata.dataset)/batchsize)+(len(train_loadata.dataset)%batchsize ==1)
-        # ))
-        
+        writer.add_scalar('train/loss',iter_loss,batch_idx)
         progress_bar(batch_idx,len(train_loadata),'Loss:{:0.4f} |  LR:{:0.6f}'.format(iter_loss.item(),optimizer.param_groups[0]['lr']))
+        # print('Training Epoch: {epoch} [{trained_samples}/{total_samples}]\tLoss: {:0.4f}\tLR: {:0.6f}'.format(
+    train_loss=train_loss/len(train_data)
+    writer.add_scalar('trainepoch/losss',train_loss,epoch)
+    print('Training Epoch: {epoch} Loss: {:0.4f}\tLR: {:0.6f}'.format(
+        iter_loss.item(),
+        optimizer.param_groups[0]['lr'],
+        epoch=epoch,
+        # trained_samples=n_iter,
+        # total_samples=int(len(train_loadata.dataset)/batchsize)+(len(train_loadata.dataset)%batchsize ==1)
+    ))
 
 
 def test(epoch):
+    print('Evaluating Network.....')
+    global test_iter
     global best_acc
     net.eval()
     modelname=type(net).__name__
@@ -82,21 +86,23 @@ def test(epoch):
             _,predicted = output.max(1)
             batchsize = predicted.size(0)
             test_loss +=iter_loss
-            n_iter = batch_idx
+            test_iter += batch_idx
             correct+=predicted.eq(label).sum().item()
             iter_acc=correct/ ((batch_idx+1)*batchsize)*100
-            writer.add_scalar('test/loss',iter_loss,n_iter) 
-            writer.add_scalar('test/acc',correct/((batch_idx+1)*batchsize),)
+            writer.add_scalar('test/loss',iter_loss,test_iter) 
+            writer.add_scalar('test/acc',correct/((batch_idx+1)*batchsize),test_iter)
             progress_bar(batch_idx,len(test_loadata),'Loss:{:0.4f} |  Acc:{:0.6f}'.format(iter_loss,iter_acc))
         finish = time.time()
         acc=correct / len(test_loadata.dataset)*100
-        print('Evaluating Network.....')
-        # print('Test set: Epoch: {}, Average loss: {:.4f}, Accuracy: {:.4f}, Time consumed:{:.2f}s'.format(
-        #     epoch,
-        #     test_loss / len(test_loadata.dataset),
-        #     acc,
-        #     finish - start
-        # ))
+        test_loss=test_loss/len(test_loadata)
+        writer.add_scalar('testepoch/losss',test_loss,epoch) 
+        writer.add_scalar('testepoch/accc',acc,epoch)
+        print('Test set: Epoch: {}, Average loss: {:.4f}, Accuracy: {:.4f}, Time consumed:{:.2f}s'.format(
+            epoch,
+            test_loss / len(test_loadata.dataset),
+            acc,
+            finish - start
+        ))
         
     if acc>best_acc:
         print('Saving .....')

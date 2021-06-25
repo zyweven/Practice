@@ -37,6 +37,7 @@ class Alexnet(nn.Module):
         self.Flat2 = nn.Linear(4096,4096)
         self.Flat3 = nn.Linear(4096,num_classes)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2)
+        self.relu = nn.ReLU(inplace=True)
 
     def forward(self,x):
         # print(x.size())

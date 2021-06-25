@@ -5,6 +5,7 @@ Alexnet 识别猫狗
 
 '''
 from numpy.core.fromnumeric import resize
+import numpy as np
 import torch
 from torch import optim
 from torch._C import device
@@ -52,7 +53,7 @@ def train(epoch):
         # print(label.size(0)) # label.size(0)表示batchsize
         correct+=predicate.eq(label).sum().item()
         acc=100*correct/total
-        writer.add_scalar('train/loss',iter_loss,batch_idx)
+        writer.add_scalar('train/loss',iter_loss,train_iter)
         progress_bar(batch_idx,len(train_loadata),'Loss:{:0.4f} |  LR:{:0.6f}'.format(iter_loss.item(),optimizer.param_groups[0]['lr']))
         # print('Training Epoch: {epoch} [{trained_samples}/{total_samples}]\tLoss: {:0.4f}\tLR: {:0.6f}'.format(
     train_loss=train_loss/len(train_data)
@@ -125,6 +126,7 @@ if __name__=='__main__':
     endepoch=200
     best_acc = 0 
     RESUME=False
+    RESUME=True
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ospath=os.path.split(os.path.realpath(__file__))[0].replace("\\","/")
@@ -134,12 +136,12 @@ if __name__=='__main__':
         transforms.RandomCrop(224,padding=4),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     ])
     transforms_test = transforms.Compose([
         transforms.Resize((224,224)),
         transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        # transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
     ])
 
     datapath =os.path.join(ospath,'data')
@@ -147,6 +149,7 @@ if __name__=='__main__':
     print(train_data)
     test_data = CatDogDataset(file_path=datapath,flag='test',transform=transforms_test)
     print(test_data)
+    
 
 
     train_loadata=DataLoader(
@@ -155,6 +158,16 @@ if __name__=='__main__':
     test_loadata = DataLoader(
         test_data,batch_size=2,shuffle=True,num_workers=1
     )
+    # 可以用于检查dataset函数是否写好了
+    for step ,(b_x,b_y) in enumerate(train_loadata):
+        if step < 3:
+            imgs = torchvision.utils.make_grid(b_x)
+            imgs = np.transpose(imgs,(1,2,0))
+            plt.imshow(imgs)
+            plt.show()
+        else:
+            break
+
     print("data over.......")
     
     print('building model.....')

@@ -67,7 +67,7 @@ def train(epoch):
     ))
 
 
-def test(epoch):
+def test(epoch,TIME_NOW):
     print('Evaluating Network.....')
     global test_iter
     global best_acc
@@ -111,6 +111,7 @@ def test(epoch):
             'net':net.state_dict(),
             'acc':acc,
             'epoch':epoch,
+            'tensorboard':TIME_NOW,
         }
         if not os.path.isdir(ospath+'/checkpoint'):
             os.mkdir(ospath+'/checkpoint')
@@ -146,9 +147,9 @@ if __name__=='__main__':
 
     datapath =os.path.join(ospath,'data')
     train_data = CatDogDataset(file_path=datapath,flag='train',transform=transforms_train)
-    print(train_data)
+    # print(train_data)
     test_data = CatDogDataset(file_path=datapath,flag='test',transform=transforms_test)
-    print(test_data)
+    # print(test_data)
     
 
 
@@ -158,15 +159,15 @@ if __name__=='__main__':
     test_loadata = DataLoader(
         test_data,batch_size=2,shuffle=True,num_workers=1
     )
-    # 可以用于检查dataset函数是否写好了
-    for step ,(b_x,b_y) in enumerate(train_loadata):
-        if step < 3:
-            imgs = torchvision.utils.make_grid(b_x)
-            imgs = np.transpose(imgs,(1,2,0))
-            plt.imshow(imgs)
-            plt.show()
-        else:
-            break
+    # # 可以用于检查dataset函数是否写好了
+    # for step ,(b_x,b_y) in enumerate(train_loadata):
+    #     if step < 3:
+    #         imgs = torchvision.utils.make_grid(b_x)
+    #         imgs = np.transpose(imgs,(1,2,0))
+    #         plt.imshow(imgs)
+    #         plt.show()
+    #     else:
+    #         break
 
     print("data over.......")
     
@@ -174,6 +175,7 @@ if __name__=='__main__':
     net=Alexnet()
     net = net.to(device)
     modelname=type(net).__name__
+    # modelname=type(net).__name__ # get the model name
     if RESUME:
         print('Resuming from checkpoint..... ')
         assert os.path.isdir(ospath+'/checkpoint'),'Error: no checkpoint find'
@@ -181,22 +183,25 @@ if __name__=='__main__':
         net.load_state_dict(checkpoint['net'])
         best_acc = checkpoint['acc']
         startepoch = checkpoint['epoch']
+        TIME_NOW = checkpoint['tensorboard']
+        writer = SummaryWriter(log_dir=os.path.join(
+        ospath+'/runs',modelname,TIME_NOW))
 
-    print('Prepare for tensorboard......')
-    modelname=type(net).__name__ # get the model name
-    if not os.path.exists(ospath+'/runs'):
-        os.mkdir(ospath+'/runs')
-    DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
-    #time of we run the script
-    TIME_NOW = datetime.now().strftime(DATE_FORMAT)
-    writer = SummaryWriter(log_dir=os.path.join(
-            ospath+'/runs',modelname,TIME_NOW))
-    # draw the model structure in tensorboard
-    td_inputtensor = torch.Tensor(1,3,224,224)
-    if device == 'cuda' :
-        td_inputtensor=td_inputtensor.cuda()
-    writer.add_graph(net,td_inputtensor)
-    print('tensorboard ready')
+    else:
+        print('Prepare for tensorboard......')
+        if not os.path.exists(ospath+'/runs'):
+            os.mkdir(ospath+'/runs')
+        DATE_FORMAT = '%A_%d_%B_%Y_%Hh_%Mm_%Ss'
+        #time of we run the script
+        TIME_NOW = datetime.now().strftime(DATE_FORMAT)
+        writer = SummaryWriter(log_dir=os.path.join(
+                ospath+'/runs',modelname,TIME_NOW))
+        # draw the model structure in tensorboard
+        td_inputtensor = torch.Tensor(1,3,224,224)
+        if device == 'cuda' :
+            td_inputtensor=td_inputtensor.cuda()
+        writer.add_graph(net,td_inputtensor)
+        print('tensorboard ready')
 
 
     print('loss, optimizer and scheduler......')
@@ -206,7 +211,7 @@ if __name__=='__main__':
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=TMAX)
     for epoch in range(startepoch ,endepoch):
         train(epoch)
-        test(epoch)
+        test(epoch,TIME_NOW)
         scheduler.step()
         
     writer.close()

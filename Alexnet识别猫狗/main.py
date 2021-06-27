@@ -127,7 +127,7 @@ if __name__=='__main__':
     endepoch=200
     best_acc = 0 
     RESUME=False
-    RESUME=True
+    # RESUME=True
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ospath=os.path.split(os.path.realpath(__file__))[0].replace("\\","/")
@@ -210,6 +210,7 @@ if __name__=='__main__':
     optimizer = optim.SGD(net.parameters(),lr=lr,momentum=momentum)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer,T_max=TMAX)
     for epoch in range(startepoch ,endepoch):
+        print(epoch)
         train(epoch)
         test(epoch,TIME_NOW)
         scheduler.step()

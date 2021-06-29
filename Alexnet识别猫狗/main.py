@@ -9,7 +9,6 @@ import numpy as np
 import torch
 from torch import optim
 from torch._C import device
-from torch.autograd.grad_mode import no_grad
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
@@ -127,7 +126,7 @@ if __name__=='__main__':
     endepoch=200
     best_acc = 0 
     RESUME=False
-    # RESUME=True
+    RESUME=True
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ospath=os.path.split(os.path.realpath(__file__))[0].replace("\\","/")

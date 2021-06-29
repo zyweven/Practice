@@ -1,117 +1,124 @@
-# simple implementation of CAM in PyTorch for the networks such as ResNet, DenseNet, SqueezeNet, Inception
-from tqdm import tqdm
-import io
-import requests
-from PIL import Image
-import torch
-from torchvision import models, transforms
-from torch.autograd import Variable
-from torch.nn import functional as F
-import numpy as np
+import argparse
 import cv2
-import pdb
-import os
-import gc
-finalconv_name = 'layer4' # 改成自己的层
-classes = {0:'neg', 1:'pos'} # 改成自己的对应关系
-params = list(net.parameters())[-2]	# 改成自己的层，一般可以不变
-features_blobs[-1] # 根据自己的喜好改
+import numpy as np
+import torch
+from torchvision import models
 
-def returnCAM(feature_conv, weight_softmax, class_idx, size_upsample=(384,384), use_gpu=False):
-    # generate the class activation maps upsample to size_upsample
-    bz, nc, h, w = feature_conv.shape
-    output_cam = []
-    for idx in class_idx:
-        if use_gpu:
-            cam = torch.mm(weight_softmax[idx].reshape(1,weight_softmax[idx].shape[0]), feature_conv.reshape((nc, h*w))).cpu().data.numpy()
-        else:
-            cam = torch.mm(weight_softmax[idx].reshape(1,weight_softmax[idx].shape[0]), feature_conv.reshape((nc, h*w))).data.numpy()
-        cam = cam.reshape(h, w)
-        cam = cam - np.min(cam)
-        cam_img = cam / np.max(cam)
-        cam_img = np.uint8(255 * cam_img)
-        output_cam.append(cv2.resize(cam_img, size_upsample))
-    return output_cam
-    
-def camImages(net, img_dir, out_dir, size=(384,384), classes = {0:'neg', 1:'pos'}, use_gpu=False):
-    '''
-    net: 自己的模型，为了方便在训练中使用cam，所以是使用的已经加载好的
-    img_dir: 你想对哪个文件夹下的图片使用
-    out_dir: 你想保存输出图片在哪个文件夹
-    size: 跟你网络的size保持一致
-    classes: 自己类别的对应关系
-    use_gpu: 是否使用gpu来加速
-    '''
-    
-    if not os.path.exists(out_dir):
-        # 判断存储文件是否存在
-        os.mkdir(out_dir)
+from pytorch_grad_cam import GradCAM, \
+                             ScoreCAM, \
+                             GradCAMPlusPlus, \
+                             AblationCAM, \
+                             XGradCAM, \
+                             EigenCAM, \
+                             EigenGradCAM
 
-    # 我使用的是 ResNeSt50，最后的特征图名字为  layer4 ，可以提前print模型来查看你自己的名字
-    finalconv_name = 'layer4'
-    if use_gpu:
-        net = net.cuda()
-    else: 
-    	net = net.cpu()
-    net.eval()
-
-    features_blobs = []
-    def hook_feature(module, input, output):
-        features_blobs.append(output.detach().data)
-    # hook函数，使用handle作为返回是为了删除它，不然会内存泄漏
-    handle = net._modules.get(finalconv_name).register_forward_hook(hook_feature)
-
-    # 一般都是这个分布
-    normalize = transforms.Normalize(
-    mean=[0.485, 0.456, 0.406],
-    std=[0.229, 0.224, 0.225]
-    )
-
-    preprocess = transforms.Compose([
-    transforms.Resize(size),
-    transforms.ToTensor(),
-    normalize
-    ])
-
-    # 开始单张图片的检测
-    for _img in tqdm(os.listdir(img_dir)):
-        img_path = os.path.join(img_dir, _img)  #获取图片路径
-        img_pil = Image.open(img_path).convert('RGB')   #读取图片
-
-        img_tensor = preprocess(img_pil)    #转为tensor
-        img_variable = Variable(img_tensor.unsqueeze(0))
-        if use_gpu:
-            logit = net(img_variable.cuda()).detach().cpu()
-        else:
-            logit = net(img_variable).detach()
-        
-        params = list(net.parameters())[-2] # 这个 -2 要注意，改成自己网络的对应层数，全连接层前面那一层，一般的网络是 -2
-        weight_softmax = np.squeeze(params.detach().data)        
-
-        h_x = F.softmax(logit, dim=1).data.squeeze()
-        probs, idx = h_x.sort(0, True)
-        probs = probs.numpy()
-        idx = idx.numpy()
-        # features_blobs[-1]表示的是你之前的 finalconv_name 那一层的特征的最后的输出
-        CAMs = returnCAM(features_blobs[-1], weight_softmax, [idx[0]], size_upsample=size, use_gpu=use_gpu)
-
-        img = cv2.imread(img_path)
-        height, width, _ = img.shape
-        heatmap = cv2.applyColorMap(cv2.resize(CAMs[0],(width, height)), cv2.COLORMAP_JET)
-        result = heatmap * 0.3 + img * 0.6
-        cv2.imwrite(os.path.join(out_dir, _img), result)  
-    # 这个时候删除 hook
-    handle.remove()
+from pytorch_grad_cam import GuidedBackpropReLUModel
+from pytorch_grad_cam.utils.image import show_cam_on_image, \
+                                         deprocess_image, \
+                                         preprocess_image
 
 
-if __name__ == "__main__":
-    net_path = './checkpoints/resnest50_v7_momentum/40.pt'
-    net = torch.load(net_path)
-    use_gpu = False
-    img_dir = './data_zf/neg'
-    out_dir = './temp_img/neg'
-    size = (368, 368)
-    # 自己的类别对应关系
-    classes = {0:'neg', 1:'pos'}
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--use-cuda', action='store_true', default=False,
+                        help='Use NVIDIA GPU acceleration')
+    parser.add_argument('--image-path', type=str, default='./examples/both.png',
+                        help='Input image path')
+    parser.add_argument('--aug_smooth', action='store_true',
+                        help='Apply test time augmentation to smooth the CAM')
+    parser.add_argument('--eigen_smooth', action='store_true',
+                        help='Reduce noise by taking the first principle componenet'
+                        'of cam_weights*activations')
+    parser.add_argument('--method', type=str, default='gradcam',
+                        choices=['gradcam', 'gradcam++', 'scorecam', 'xgradcam',
+                                 'ablationcam', 'eigencam', 'eigengradcam'],
+                        help='Can be gradcam/gradcam++/scorecam/xgradcam'
+                             '/ablationcam/eigencam/eigengradcam')
 
-    camImages(net, img_dir, out_dir, size=size, classes=classes, use_gpu=use_gpu)
+    args = parser.parse_args()
+    args.use_cuda = args.use_cuda and torch.cuda.is_available()
+    if args.use_cuda:
+        print('Using GPU for acceleration')
+    else:
+        print('Using CPU for computation')
+
+    return args
+
+
+if __name__ == '__main__':
+    """ python cam.py -image-path <path_to_image>
+    Example usage of loading an image, and computing:
+        1. CAM
+        2. Guided Back Propagation
+        3. Combining both
+    """
+
+    args = get_args()
+    methods = \
+        {"gradcam": GradCAM,
+         "scorecam": ScoreCAM,
+         "gradcam++": GradCAMPlusPlus,
+         "ablationcam": AblationCAM,
+         "xgradcam": XGradCAM,
+         "eigencam": EigenCAM,
+         "eigengradcam": EigenGradCAM}
+
+    model = models.resnet50(pretrained=True)
+    from model import Alexnet
+    import os
+    ospath=os.path.split(os.path.realpath(__file__))[0].replace("\\","/")
+    model = Alexnet().eval()
+    modelname=type(model).__name__
+    checkpoint = torch.load(ospath+'/checkpoint/' + modelname +'.pth' )
+    model.load_state_dict(checkpoint['net'])
+
+    # Choose the target layer you want to compute the visualization for.
+    # Usually this will be the last convolutional layer in the model.
+    # Some common choices can be:
+    # Resnet18 and 50: model.layer4[-1]
+    # VGG, densenet161: model.features[-1]
+    # mnasnet1_0: model.layers[-1]
+    # You can print the model to help chose the layer
+    target_layer = model.conv4
+
+    cam = methods[args.method](model=model,
+                               target_layer=target_layer,
+                               use_cuda=args.use_cuda)
+
+    rgb_img = cv2.imread(args.image_path, 1)[:, :, ::-1]
+    rgb_img = np.float32(rgb_img) / 255
+    input_tensor = preprocess_image(rgb_img, mean=[0.485, 0.456, 0.406], 
+                                             std=[0.229, 0.224, 0.225])
+    print(input_tensor.shape)
+
+    # If None, returns the map for the highest scoring category.
+    # Otherwise, targets the requested category.
+    target_category = None
+
+    # AblationCAM and ScoreCAM have batched implementations.
+    # You can override the internal batch size for faster computation.
+    cam.batch_size = 32
+
+    grayscale_cam = cam(input_tensor=input_tensor,
+                        target_category=target_category,
+                        aug_smooth=args.aug_smooth,
+                        eigen_smooth=args.eigen_smooth)
+
+    # Here grayscale_cam has only one image in the batch
+    grayscale_cam = grayscale_cam[0, :]
+
+    cam_image = show_cam_on_image(rgb_img, grayscale_cam, use_rgb=True)
+
+    # cam_image is RGB encoded whereas "cv2.imwrite" requires BGR encoding.
+    cam_image = cv2.cvtColor(cam_image, cv2.COLOR_RGB2BGR)
+
+    gb_model = GuidedBackpropReLUModel(model=model, use_cuda=args.use_cuda)
+    gb = gb_model(input_tensor, target_category=target_category)
+
+    cam_mask = cv2.merge([grayscale_cam, grayscale_cam, grayscale_cam])
+    cam_gb = deprocess_image(cam_mask * gb)
+    gb = deprocess_image(gb)
+
+    cv2.imwrite(f'{args.method}_cam.jpg', cam_image)
+    cv2.imwrite(f'{args.method}_gb.jpg', gb)
+    cv2.imwrite(f'{args.method}_cam_gb.jpg', cam_gb)
